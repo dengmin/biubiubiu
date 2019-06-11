@@ -8,7 +8,7 @@ services:
     enableRatelimit: false
     enableCache: true
     loadBalance: random
-    whiteIps: 122.224.178.178
+    whiteIps: 127.0.0.1
   - name: roseMember
     server:
       - 121.40.210.184:8070
