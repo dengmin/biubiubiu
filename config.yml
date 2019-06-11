@@ -1,0 +1,16 @@
+
+logPretty: false
+services:
+  - name: pjkOrder
+    server:
+      - 121.40.59.24:8068
+    host: pjk-order.api.yunchuangfu.com
+    enableRatelimit: false
+    enableCache: true
+    loadBalance: random
+  - name: roseMember
+    server:
+      - 121.40.210.184:8070
+    host: rose-member.api.yunchuangfu.com
+    enableRatelimit: true
+    enableCache: false
