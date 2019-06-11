@@ -14,6 +14,7 @@ import (
 
 type Handler struct {
 	Inst Instance
+	ConfigContext ProxyConfigContext
 }
 
 
@@ -47,7 +48,7 @@ func (handler *Handler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Requ
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	r.URL.Scheme = remote.Scheme
 	r.URL.Path = uri
-	r.Header.Set("Host", instance.Host)
+	r.Header.Set("Host", instance.Domain)
 
 	proxy.ModifyResponse = rewriteBody
 	proxy.ServeHTTP(w, r)

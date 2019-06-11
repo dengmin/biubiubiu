@@ -11,7 +11,7 @@ type ProxyConfigContext struct {
 type Instance struct {
 	Name string `yaml:"name"`
 	Server []string `yaml:"server"`
-	Host string `yaml:"host"`
+	Domain string `yaml:"domain"`
 	EnableRateLimit bool `yaml:"enableRateLimit"`
 	EnableCache bool `yaml:"enableCache"`
 	LoadBalance string `yaml:"loadBalance"`

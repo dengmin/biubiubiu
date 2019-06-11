@@ -34,7 +34,7 @@ func main() {
 		}
 		instance := proxyMap[app]
 
-		handler := &core.Handler{Inst: instance}
+		handler := &core.Handler{Inst: instance, ConfigContext:configContext}
 		handler.ServeHTTP(uri, w, r)
 	})
 
