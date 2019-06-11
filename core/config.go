@@ -21,7 +21,6 @@ func NewProxyConfigMap() (map[string]Instance, ProxyConfigContext, error){
 	for i:=0; i<len(configContext.Services); i++{
 		instance := configContext.Services[i]
 		proxyMap[instance.Name] = instance
-		log.Println(instance.Server)
 	}
 	return proxyMap, *configContext, nil
 }

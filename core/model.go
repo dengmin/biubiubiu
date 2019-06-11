@@ -15,6 +15,7 @@ type Instance struct {
 	EnableRateLimit bool `yaml:"enableRateLimit"`
 	EnableCache bool `yaml:"enableCache"`
 	LoadBalance string `yaml:"loadBalance"`
+	WhiteIps string `yaml:"whiteIps"`
 }
 
 func (inst *Instance) GetLoadBalance() balance.LoadBalance {
