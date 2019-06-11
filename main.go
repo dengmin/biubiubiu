@@ -4,6 +4,7 @@ import (
 	"biubiubiu/core"
 	"biubiubiu/plugins"
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 	"log"
 	"net/http"
 )
@@ -15,6 +16,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(plugins.Cors)
+	r.Use(middleware.Recoverer)
 
 	r.HandleFunc("/p/{app}/{uri}", func(w http.ResponseWriter, r *http.Request) {
 		app := chi.URLParam(r, "app")

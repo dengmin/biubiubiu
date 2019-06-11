@@ -34,6 +34,8 @@ func (handler *Handler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	//TODO get response from cache
+
 	server, err := instance.GetLoadBalance().Target()
 	if err != nil{
 		log.Fatal(err)
