@@ -1,24 +1,25 @@
 package core
 
 import (
-	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
-type Handler struct {
+const  CacheHeader = "X-Cache"
+
+type CommonHandler struct {
 	Inst Instance
 	ConfigContext ProxyConfigContext
 }
 
 
-func (handler *Handler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Request){
+func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Request){
 
 	instance := handler.Inst
 
@@ -33,8 +34,6 @@ func (handler *Handler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-
-	//TODO get response from cache
 
 	server, err := instance.GetLoadBalance().Target()
 	if err != nil{
@@ -52,25 +51,27 @@ func (handler *Handler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Requ
 	r.URL.Path = uri
 	r.Header.Set("Host", instance.Domain)
 
-	proxy.ModifyResponse = rewriteBody
-	proxy.ServeHTTP(w, r)
-}
+	rw := newResponseStreamer(w)
+	rdr, err := rw.Stream.NextReader()
+	if err != nil {
+		w.Header().Set(CacheHeader, "SKIP")
+		proxy.ServeHTTP(w, r)
+		return
+	}
 
-func rewriteBody(resp *http.Response) (err error) {
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return  err
+	rw.Header().Set(CacheHeader, "MISS")
+	go func() {
+		proxy.ServeHTTP(rw, r)
+		rw.Stream.Close()
+	}()
+	rw.WaitHeaders()
+
+	b, err := ioutil.ReadAll(rdr)
+	if err := rdr.Close(); err != nil{
+		log.Print("stream close error" + err.Error())
 	}
-	//log.Println(string(b))
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-	body := ioutil.NopCloser(bytes.NewReader(b))
-	resp.Body = body
-	resp.ContentLength = int64(len(b))
-	resp.Header.Set("Content-Length", strconv.Itoa(len(b)))
-	return nil
+	fmt.Println(string(b))
+	//proxy.ServeHTTP(w, r)
 }
 
 
@@ -98,3 +99,4 @@ func constantIp(ips []string, realIp string) bool {
 	}
 	return false
 }
+

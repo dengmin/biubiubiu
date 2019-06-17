@@ -25,4 +25,14 @@ func NewProxyConfigMap() (map[string]Instance, ProxyConfigContext, error){
 	return proxyMap, *configContext, nil
 }
 
+var proxyMap, configContext, _ = NewProxyConfigMap()
+
+func GetProxyMap() map[string]Instance{
+	return proxyMap
+}
+
+func GetConfigContext() ProxyConfigContext{
+	return configContext
+}
+
 

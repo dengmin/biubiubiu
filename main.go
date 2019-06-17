@@ -12,7 +12,8 @@ import (
 
 func main() {
 
-	proxyMap, configContext, _ := core.NewProxyConfigMap()
+	proxyMap := core.GetProxyMap()
+	configContext := core.GetConfigContext()
 
 	r := chi.NewRouter()
 	r.Use(plugins.Cors)
@@ -28,8 +29,7 @@ func main() {
 			return
 		}
 		instance := proxyMap[app]
-
-		handler := &core.Handler{Inst: instance, ConfigContext:configContext}
+		handler := &core.CommonHandler{Inst: instance, ConfigContext: configContext}
 		handler.ServeHTTP(uri, w, r)
 	})
 
