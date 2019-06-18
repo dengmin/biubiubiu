@@ -40,6 +40,14 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		}
 	}
 
+	//清空缓存
+	if uri == "_clean_cache" {
+		c.Flush()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("cache cleaned!"))
+		return
+	}
+
 	server, err := instance.GetLoadBalance().Target()
 	if err != nil{
 		log.Fatal(err)
@@ -51,20 +59,21 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		log.Fatal(err)
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(remote)
-	r.URL.Scheme = remote.Scheme
-	r.URL.Path = uri
-	r.Header.Set("Host", instance.Domain)
-
-	cacheKey := buildKeys(r)
+	cacheKey := handler.buildKeys(r)
 	fmt.Println("cache key: " + cacheKey)
 
 	v, found := c.Get(cacheKey)
 	if found {
+		log.Println("get entry from cache")
 		w.Header().Set(CacheHeader, "HIT")
 		w.Write([]byte(v.(string)))
 		return
 	}
+
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	r.URL.Scheme = remote.Scheme
+	r.URL.Path = uri
+	r.Header.Set("Host", instance.Domain)
 
 	rw := newResponseStreamer(w)
 	rdr, err := rw.Stream.NextReader()
@@ -87,7 +96,9 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	}
 	//只对GET请求缓存
 	if r.Method == "GET" {
-		c.Set(cacheKey, string(b), cache.DefaultExpiration)
+		go func() {
+			c.Set(cacheKey, string(b), cache.DefaultExpiration)
+		}()
 	}
 
 }
@@ -100,7 +111,9 @@ func md5Encrypt(data string) string{
 }
 
 //通过参数生成缓存的key,并md5
-func buildKeys(r *http.Request) string{
+func (handler *CommonHandler)buildKeys(r *http.Request) string{
+	cacheKeyFormat := handler.Inst.CacheKey
+	log.Println(cacheKeyFormat)
 	//获取参数
 	t := r.URL.Query().Encode()
 	realIp := getRealIP(r)

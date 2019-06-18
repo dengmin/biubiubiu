@@ -14,6 +14,7 @@ type Instance struct {
 	Domain string `yaml:"domain"`
 	EnableRateLimit bool `yaml:"enableRateLimit"`
 	EnableCache bool `yaml:"enableCache"`
+	CacheKey string `yaml:"cacheKey"`
 	LoadBalance string `yaml:"loadBalance"`
 	WhiteIps string `yaml:"whiteIps"`
 }
