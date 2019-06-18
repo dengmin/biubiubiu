@@ -1,6 +1,9 @@
 package core
 
 import (
+	"biubiubiu/cache"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,6 +12,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const  CacheHeader = "X-Cache"
@@ -18,12 +22,13 @@ type CommonHandler struct {
 	ConfigContext ProxyConfigContext
 }
 
+var c = cache.New(5*time.Minute, 10*time.Minute)
 
 func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Request){
 
 	instance := handler.Inst
 
-	realIpAddr := realIP(r)
+	realIpAddr := getRealIP(r)
 
 	if len(instance.WhiteIps) > 0{
 		ipList := strings.Split(instance.WhiteIps, ",")
@@ -51,6 +56,16 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	r.URL.Path = uri
 	r.Header.Set("Host", instance.Domain)
 
+	cacheKey := buildKeys(r)
+	fmt.Println("cache key: " + cacheKey)
+
+	v, found := c.Get(cacheKey)
+	if found {
+		w.Header().Set(CacheHeader, "HIT")
+		w.Write([]byte(v.(string)))
+		return
+	}
+
 	rw := newResponseStreamer(w)
 	rdr, err := rw.Stream.NextReader()
 	if err != nil {
@@ -62,7 +77,7 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	rw.Header().Set(CacheHeader, "MISS")
 	go func() {
 		proxy.ServeHTTP(rw, r)
-		rw.Stream.Close()
+		_ = rw.Stream.Close()
 	}()
 	rw.WaitHeaders()
 
@@ -70,12 +85,31 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	if err := rdr.Close(); err != nil{
 		log.Print("stream close error" + err.Error())
 	}
-	fmt.Println(string(b))
-	//proxy.ServeHTTP(w, r)
+	//只对GET请求缓存
+	if r.Method == "GET" {
+		c.Set(cacheKey, string(b), cache.DefaultExpiration)
+	}
+
+}
+
+func md5Encrypt(data string) string{
+	h := md5.New()
+	h.Write([]byte(string(data)))
+	cipherStr := h.Sum(nil)
+	return hex.EncodeToString(cipherStr)
+}
+
+//通过参数生成缓存的key,并md5
+func buildKeys(r *http.Request) string{
+	//获取参数
+	t := r.URL.Query().Encode()
+	realIp := getRealIP(r)
+	target := realIp+":"+r.URL.Path+":"+t
+	return md5Encrypt(target)
 }
 
 
-func realIP(req *http.Request) string {
+func getRealIP(req *http.Request) string {
 	remoteAddr := req.RemoteAddr
 	if ip := req.Header.Get("X-Real-IP"); ip != "" {
 		remoteAddr = ip
