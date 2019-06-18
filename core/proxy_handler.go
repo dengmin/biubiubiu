@@ -4,7 +4,6 @@ import (
 	"biubiubiu/cache"
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -22,7 +21,7 @@ type CommonHandler struct {
 	ConfigContext ProxyConfigContext
 }
 
-var c = cache.New(5*time.Minute, 10*time.Minute)
+var cacheMap = make(map[string]*cache.Cache)
 
 func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *http.Request){
 
@@ -40,12 +39,36 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		}
 	}
 
-	//清空缓存
-	if uri == "_clean_cache" {
-		c.Flush()
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("cache cleaned!"))
-		return
+	var cacheKey = ""
+	var c *cache.Cache
+
+	if instance.EnableCache {
+
+		if _, ok := cacheMap[instance.Name]; !ok {
+			c = cache.New(5*time.Minute, 10*time.Minute)
+			cacheMap[instance.Name] = c
+		}else{
+			c = cacheMap[instance.Name]
+		}
+
+		//清空缓存
+		if uri == "_clean_cache" {
+			c.Flush()
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte("cache cleaned!"))
+			return
+		}
+
+		cacheKey := handler.buildKeys(r)
+
+		//从缓存中读取数据写入到response
+		v, found := c.Get(cacheKey)
+		if found {
+			log.Println("get entry from cache")
+			w.Header().Set(CacheHeader, "HIT")
+			w.Write([]byte(v.(string)))
+			return
+		}
 	}
 
 	server, err := instance.GetLoadBalance().Target()
@@ -59,16 +82,6 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		log.Fatal(err)
 	}
 
-	cacheKey := handler.buildKeys(r)
-	fmt.Println("cache key: " + cacheKey)
-
-	v, found := c.Get(cacheKey)
-	if found {
-		log.Println("get entry from cache")
-		w.Header().Set(CacheHeader, "HIT")
-		w.Write([]byte(v.(string)))
-		return
-	}
 
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	r.URL.Scheme = remote.Scheme
@@ -78,12 +91,14 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	rw := newResponseStreamer(w)
 	rdr, err := rw.Stream.NextReader()
 	if err != nil {
-		w.Header().Set(CacheHeader, "SKIP")
 		proxy.ServeHTTP(w, r)
 		return
 	}
 
-	rw.Header().Set(CacheHeader, "MISS")
+	if instance.EnableCache {
+		rw.Header().Set(CacheHeader, "MISS")
+	}
+
 	go func() {
 		proxy.ServeHTTP(rw, r)
 		_ = rw.Stream.Close()
@@ -94,14 +109,20 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	if err := rdr.Close(); err != nil{
 		log.Print("stream close error" + err.Error())
 	}
+
 	//只对GET请求缓存
-	if r.Method == "GET" {
+	if instance.EnableCache && r.Method == "GET" {
 		go func() {
 			c.Set(cacheKey, string(b), cache.DefaultExpiration)
 		}()
 	}
 
 }
+
+func (handler *CommonHandler) findCache(cacheKey string){
+
+}
+
 
 func md5Encrypt(data string) string{
 	h := md5.New()
@@ -111,7 +132,7 @@ func md5Encrypt(data string) string{
 }
 
 //通过参数生成缓存的key,并md5
-func (handler *CommonHandler)buildKeys(r *http.Request) string{
+func (handler *CommonHandler) buildKeys(r *http.Request) string{
 	cacheKeyFormat := handler.Inst.CacheKey
 	log.Println(cacheKeyFormat)
 	//获取参数
