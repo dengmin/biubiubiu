@@ -2,11 +2,8 @@ package core
 
 import (
 	"biubiubiu/cache"
-	"crypto/md5"
-	"encoding/hex"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -69,6 +66,7 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 			w.Write([]byte(v.(string)))
 			return
 		}
+		w.Header().Set(CacheHeader, "MISS")
 	}
 
 	server, err := instance.GetLoadBalance().Target()
@@ -95,10 +93,6 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		return
 	}
 
-	if instance.EnableCache {
-		rw.Header().Set(CacheHeader, "MISS")
-	}
-
 	go func() {
 		proxy.ServeHTTP(rw, r)
 		_ = rw.Stream.Close()
@@ -117,18 +111,11 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 		}()
 	}
 
-}
+	//状态码500报警
+	if rw.StatusCode > 500{
+		//TODO
+	}
 
-func (handler *CommonHandler) findCache(cacheKey string){
-
-}
-
-
-func md5Encrypt(data string) string{
-	h := md5.New()
-	h.Write([]byte(string(data)))
-	cipherStr := h.Sum(nil)
-	return hex.EncodeToString(cipherStr)
 }
 
 //通过参数生成缓存的key,并md5
@@ -141,30 +128,3 @@ func (handler *CommonHandler) buildKeys(r *http.Request) string{
 	target := realIp+":"+r.URL.Path+":"+t
 	return md5Encrypt(target)
 }
-
-
-func getRealIP(req *http.Request) string {
-	remoteAddr := req.RemoteAddr
-	if ip := req.Header.Get("X-Real-IP"); ip != "" {
-		remoteAddr = ip
-	} else if ip = req.Header.Get("X-Forwarded-For"); ip != "" {
-		remoteAddr = ip
-	} else {
-		remoteAddr, _, _ = net.SplitHostPort(remoteAddr)
-	}
-
-	if remoteAddr == "::1" {
-		remoteAddr = "127.0.0.1"
-	}
-	return remoteAddr
-}
-
-func constantIp(ips []string, realIp string) bool {
-	for i := 0; i < len(ips); i++ {
-		if ips[i] == realIp {
-			return true
-		}
-	}
-	return false
-}
-
