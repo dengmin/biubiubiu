@@ -3,6 +3,7 @@ package main
 import (
 	"biubiubiu/core"
 	"biubiubiu/plugins"
+	"github.com/fvbock/endless"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"log"
@@ -33,5 +34,7 @@ func main() {
 		handler.ServeHTTP(uri, w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(":3000", r))
+	err := endless.ListenAndServe(":3000", r)
+
+	log.Fatal(err)
 }

@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
@@ -81,7 +80,7 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 	}
 
 
-	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxy := NewSingleHostReverseProxy(remote)
 	r.URL.Scheme = remote.Scheme
 	r.URL.Path = uri
 	r.Header.Set("Host", instance.Domain)
@@ -120,8 +119,8 @@ func (handler *CommonHandler)ServeHTTP(uri string, w http.ResponseWriter, r *htt
 
 //通过参数生成缓存的key,并md5
 func (handler *CommonHandler) buildKeys(r *http.Request) string{
-	cacheKeyFormat := handler.Inst.CacheKey
-	log.Println(cacheKeyFormat)
+	//cacheKeyFormat := handler.Inst.CacheKey
+	//log.Println(cacheKeyFormat)
 	//获取参数
 	t := r.URL.Query().Encode()
 	realIp := getRealIP(r)
